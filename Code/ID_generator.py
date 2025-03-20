@@ -29,7 +29,6 @@ id_prefix_map = {
 # 權重 (依照台灣身分證字號驗證碼計算方式)
 weights = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1]
 
-
 def generate_taiwan_id():
     # 隨機選擇一個英文字母
     letter = random.choice(list(id_prefix_map.keys()))
@@ -81,7 +80,9 @@ def generate_foreigner_id():
     # 組合完整身分證字號
     taiwan_id = f"{letter}{gender}{''.join(map(str, random_numbers))}{check_digit}"
     return taiwan_id
-
-# 產生 10 個測試
-#for _ in range(10):
-#   print(generate_taiwan_id())
+#%%
+'''
+產生 10 個測試
+for _ in range(10):
+print(generate_taiwan_id())
+'''
