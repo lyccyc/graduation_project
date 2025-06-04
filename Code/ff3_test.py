@@ -2,6 +2,10 @@ from ff3 import FF3Cipher
 import pandas as pd
 import hashlib
 
+key = "2DE79D232DF5585D68CE47882AE256D6"
+tweak = "CBD09280979564"
+cipher = FF3Cipher(key, tweak)
+
 # ====== 工具函數 ======
 letter_map = {
     "A1": "00",  "B1": "01",  "C1": "02",  "D1": "03",  "E1": "04",
@@ -70,18 +74,25 @@ def encrypted_numeric_to_id(numeric):
     return letter + rest + check
 
 #%%
-def adject_value(plaintext,numeric):  
+def adject_value(plaintext, numeric, cipher):
     judge = int(numeric[:2])
     if judge < 50:
         return encrypted_numeric_to_id(numeric)
-    else:
-        adject_value = int(plaintext[:2]) + 50
-        p = str(adject_value) + plaintext[2:]
-        encrypted_numeric = cipher.encrypt(p)
-        if int(encrypted_numeric[:2]) < 50 :
-            return encrypted_numeric_to_id(encrypted_numeric)
-        else :
+    
+    adjusted_prefix = int(plaintext[:2]) + 50
+    if adjusted_prefix >= 100:
+        return "A000000000"
+    
+    new_plaintext = str(adjusted_prefix).zfill(2) + plaintext[2:]
+    try:
+        re_encrypted = cipher.encrypt(new_plaintext)
+        if int(re_encrypted[:2]) < 50:
+            return encrypted_numeric_to_id(re_encrypted)
+        else:
             return "A000000000"
+    except:
+        return "A000000000"
+
         
 #%%
 def decrypted_numeric_to_id(numeric):
@@ -93,9 +104,7 @@ def generate_tweak(index):
     # 使用 row index 作為 deterministic tweak 來源
     return hashlib.sha256(str(index).encode()).hexdigest()[:14].upper()
 
-key = "2DE79D232DF5585D68CE47882AE256D6"
-tweak = "CBD09280979564"
-cipher = FF3Cipher(key, tweak)
+
 
 #%%
 '''
