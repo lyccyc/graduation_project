@@ -12,5 +12,5 @@ excel_file = "tw_id_list.xlsx"
 with pd.ExcelWriter(excel_file, engine="xlsxwriter") as writer:
     df.to_excel(writer, index=False, sheet_name="ID")
 
-print(" CSV 檔案已生成：tw_id_list.csv")
-print(" EXCEL 檔案已生成：tw_id_list.xlsx")
+print(" CSV 檔案已生成：files/tw_id_list.csv")
+print(" EXCEL 檔案已生成：files/tw_id_list.xlsx")
