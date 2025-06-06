@@ -1,3 +1,5 @@
+# === ff3_test.py (修改版) ===
+
 import hashlib
 from ff3 import FF3Cipher
 
@@ -28,10 +30,10 @@ def calculate_check_digit(id9):
 def id_to_numeric(id_number):
     prefix = id_number[0:2]
     if prefix not in letter_map:
-        raise ValueError(f"身分證字首不合法: {prefix}")
+        raise ValueError(f"\u8eab\u5206\u8b49\u5b57\u9996\u4e0d\u5408\u6cd5: {prefix}")
     numeric_prefix = int(letter_map[prefix])
     if numeric_prefix >= 50:
-        raise ValueError(f"非本國身分證字首: {prefix} → {numeric_prefix} ≥ 50")
+        raise ValueError(f"\u975e\u672c\u570b\u8eab\u5206\u8b49\u5b57\u9996: {prefix} → {numeric_prefix} ≥ 50")
     return str(numeric_prefix).zfill(2) + id_number[2:10]
 
 def encrypted_numeric_to_id(numeric):
@@ -52,22 +54,59 @@ def generate_tweak(index):
 def generate_fallback_tweak(index):
     return hashlib.sha256(f"{index}_retry".encode()).hexdigest()[:14].upper()
 
-def adject_value(plaintext, numeric, cipher, index, key):
-    judge = int(numeric[:2])
-    if judge < 50:
-        return encrypted_numeric_to_id(numeric)
+def encrypt_with_fallback_and_swap(df, idx, key):
+    def encrypt_id(id_str, tweak, key):
+        plaintext = id_to_numeric(id_str)
+        cipher = FF3Cipher(key, tweak)
+        encrypted_numeric = cipher.encrypt(plaintext)
+        return plaintext, encrypted_numeric, cipher
 
-    adjusted_prefix = int(plaintext[:2]) + 50
-    if adjusted_prefix >= 100:
-        return "A000000000"
+    def attempt_adjustment(plaintext, encrypted_numeric, idx):
+        judge = int(encrypted_numeric[:2])
+        if judge < 50:
+            return encrypted_numeric_to_id(encrypted_numeric), encrypted_numeric, False
 
-    new_plaintext = str(adjusted_prefix).zfill(2) + plaintext[2:]
-    fallback_tweak = generate_fallback_tweak(index)
-    fallback_cipher = FF3Cipher(key, fallback_tweak)
-    try:
-        re_encrypted = fallback_cipher.encrypt(new_plaintext)
-        if int(re_encrypted[:2]) < 50:
-            return encrypted_numeric_to_id(re_encrypted)
-    except:
-        pass
-    return "A000000000"
+        adjusted_prefix = int(plaintext[:2]) + 50
+        if adjusted_prefix >= 100:
+            return "A000000000", encrypted_numeric, False
+
+        new_plaintext = str(adjusted_prefix).zfill(2) + plaintext[2:]
+        fallback_tweak = generate_fallback_tweak(idx)
+        fallback_cipher = FF3Cipher(key, fallback_tweak)
+        try:
+            re_encrypted = fallback_cipher.encrypt(new_plaintext)
+            if int(re_encrypted[:2]) < 50:
+                return encrypted_numeric_to_id(re_encrypted), re_encrypted, True
+        except:
+            pass
+        return "A000000000", encrypted_numeric, False
+
+    # 第一次嘗試
+    original_id = df.at[idx, 'ID']
+    tweak = generate_tweak(idx)
+    plaintext, encrypted_numeric, cipher = encrypt_id(original_id, tweak, key)
+    encrypted_id, final_numeric, used_fallback = attempt_adjustment(plaintext, encrypted_numeric, idx)
+
+    if encrypted_id != "A000000000":
+        return {
+            'Original_ID': original_id,
+            'Plaintext': plaintext,
+            'Encrypted_Numeric': final_numeric,
+            'Encrypted_ID': encrypted_id,
+            'Used_Fallback': used_fallback
+        }
+
+    if idx + 1 >= len(df):
+        return {
+            'Original_ID': original_id,
+            'Plaintext': plaintext,
+            'Encrypted_Numeric': final_numeric,
+            'Encrypted_ID': "A000000000",
+            'Used_Fallback': used_fallback
+        }
+
+    # 對調並遞迴處理兩筆
+    df.at[idx, 'ID'], df.at[idx + 1, 'ID'] = df.at[idx + 1, 'ID'], df.at[idx, 'ID']
+    result1 = encrypt_with_fallback_and_swap(df, idx, key)
+    result2 = encrypt_with_fallback_and_swap(df, idx + 1, key)
+    return [result1, result2]
