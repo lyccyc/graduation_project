@@ -1,10 +1,27 @@
-# === ff3_id_test_v2.py (整合新版) ===
-
 import pandas as pd
 from ff3 import FF3Cipher
 import ff3_test as ff3
 
 KEY = "2DE79D232DF5585D68CE47882AE256D6"
+
+def process_row(df, idx, key):
+    original_id = df.at[idx, 'ID']
+    plaintext = ff3.id_to_numeric(original_id)
+    tweak = ff3.generate_tweak(idx)
+    cipher = FF3Cipher(key, tweak)
+
+    encrypted_numeric = cipher.encrypt(plaintext)
+    encrypted_id = ff3.adject_value(plaintext, encrypted_numeric, idx, key)
+    decrypted_numeric = cipher.decrypt(encrypted_numeric)
+    decrypted_id = ff3.decrypted_numeric_to_id(decrypted_numeric)
+    
+    return {
+        'Original_ID': original_id,
+        'Plaintext': plaintext,
+        'Encrypted_Numeric': encrypted_numeric,
+        'Encrypted_ID': encrypted_id,
+        'Decrypted_ID': decrypted_id
+    }
 
 def process_csv(input_csv, output_csv):
     df = pd.read_csv(input_csv)
@@ -12,31 +29,25 @@ def process_csv(input_csv, output_csv):
     idx = 0
 
     while idx < len(df):
-        result = ff3.encrypt_with_fallback_and_swap(df, idx, KEY)
+        result = process_row(df, idx, KEY)
 
-        if isinstance(result, list):
-            results.extend(result)
-            idx += 2  # 處理了兩筆資料
+        if result['Encrypted_ID'] == "A000000000" and idx > 0:
+            # 對調
+            df.at[idx, 'ID'], df.at[idx + 1, 'ID'] = df.at[idx + 1, 'ID'], df.at[idx, 'ID']
+            result_prev = process_row(df, idx + 1, KEY)
+            result = process_row(df, idx, KEY)
+
+            if result['Encrypted_ID'] != "A000000000" and result_prev['Encrypted_ID'] != "A000000000":
+                results[-1] = result_prev
+                results.append(result)  
+            else:
+                df.at[idx, 'ID'], df.at[idx - 1, 'ID'] = df.at[idx - 1, 'ID'], df.at[idx, 'ID']
+                result = process_row(df, idx, KEY)
+                results.append(result)  
         else:
             results.append(result)
-            idx += 1
 
-    # 補上解密欄位
-    for r in results:
-        if r['Encrypted_ID'] != "A000000000":
-            # 需要用正確的 tweak 來解密
-            i = results.index(r)
-            tweak = ff3.generate_tweak(i)
-            cipher = FF3Cipher(KEY, tweak)
-            try:
-                decrypted = cipher.decrypt(r['Encrypted_Numeric'])
-            except:
-                fallback_tweak = ff3.generate_fallback_tweak(i)
-                cipher = FF3Cipher(KEY, fallback_tweak)
-                decrypted = cipher.decrypt(r['Encrypted_Numeric'])
-            r['Decrypted_ID'] = ff3.decrypted_numeric_to_id(decrypted)
-        else:
-            r['Decrypted_ID'] = ""
+        idx += 1
 
     output_df = pd.DataFrame(results)
     output_df.to_csv(output_csv, index=False)

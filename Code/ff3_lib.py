@@ -23,11 +23,11 @@ reverse_map = {v: k for k, v in letter_map.items()}
 def id_to_numeric(id_number):
     prefix = id_number[0:2]
     numeric_prefix = int(letter_map[prefix])
-    return str(numeric_prefix).zfill(2) + id_number[2:10]
+    return str(numeric_prefix) + id_number[2:10]
 
 def encrypted_numeric_to_id(numeric):
-    letter = reverse_map.get(numeric[:2], "??")
-    translate_letter = translate_map.get(letter[0], "00")
+    letter = reverse_map[numeric[:2]]
+    translate_letter = translate_map[letter[0]]
     rest = numeric[2:9]
     check = calculate_check_digit(translate_letter + rest)
     return letter + rest + check
@@ -53,7 +53,7 @@ def generate_fallback_tweak(index):
 def create_cipher_and_encrypt(id_str, index, key, plus50=False):
     plaintext = id_to_numeric(id_str)
     if plus50:
-        plaintext = str(int(plaintext[:2]) + 50).zfill(2) + plaintext[2:]
+        plaintext = str(int(plaintext[:2]) + 50) + plaintext[2:]
     tweak = generate_tweak(index)
     cipher = FF3Cipher(key, tweak)
     encrypted = cipher.encrypt(plaintext)
