@@ -1,6 +1,8 @@
 import hashlib
 from ff3 import FF3Cipher
 
+KEY = "2DE79D232DF5585D68CE47882AE256D6"
+
 letter_map = {
     "A1": "00", "B1": "01", "C1": "02", "D1": "03", "E1": "04",
     "F1": "05", "G1": "06", "H1": "07", "I1": "08", "J1": "09",
@@ -13,17 +15,19 @@ letter_map = {
     "P2": "40", "Q2": "41", "R2": "42", "S2": "43", "T2": "44",
     "U2": "45", "V2": "46", "W2": "47", "X2": "48", "Z2": "49"
 }
+
 translate_map = {
     "A": "10", "B": "11", "C": "12", "D": "13", "E": "14", "F": "15", "G": "16", "H": "17",
     "I": "34", "J": "18", "K": "19", "L": "20", "M": "21", "N": "22", "O": "35", "P": "23",
     "Q": "24", "R": "25", "S": "26", "T": "27", "U": "28", "V": "29", "W": "32", "X": "30", "Z": "33"
 }
+
 reverse_map = {v: k for k, v in letter_map.items()}
 
 def id_to_numeric(id_number):
     prefix = id_number[0:2]
     numeric_prefix = int(letter_map[prefix])
-    return str(numeric_prefix) + id_number[2:10]
+    return str(numeric_prefix).zfill(2) + id_number[2:10]
 
 def encrypted_numeric_to_id(numeric):
     letter = reverse_map[numeric[:2]]
@@ -47,13 +51,10 @@ def calculate_check_digit(id9):
 def generate_tweak(index):
     return hashlib.sha256(str(index).encode()).hexdigest()[:14].upper()
 
-def generate_fallback_tweak(index):
-    return hashlib.sha256(f"{index}_retry".encode()).hexdigest()[:14].upper()
-
 def create_cipher_and_encrypt(id_str, index, key, plus50=False):
     plaintext = id_to_numeric(id_str)
     if plus50:
-        plaintext = str(int(plaintext[:2]) + 50) + plaintext[2:]
+        plaintext = str(int(plaintext[:2]) + 50).zfill(2) + plaintext[2:]
     tweak = generate_tweak(index)
     cipher = FF3Cipher(key, tweak)
     encrypted = cipher.encrypt(plaintext)
@@ -66,87 +67,68 @@ def decrypt_to_id(encrypted, cipher, plus50):
         decrypted = prefix + decrypted[2:]
     return decrypted_numeric_to_id(decrypted)
 
-def try_encrypt_record(df, idx, key, swap_count_map, results):
+def decrypt_with_tweak(encrypted_numeric, plus50, encrypt_index):
+    tweak = generate_tweak(encrypt_index)
+    cipher = FF3Cipher(KEY, tweak)
+    decrypted = cipher.decrypt(encrypted_numeric)
+    if plus50:
+        prefix = str(int(decrypted[:2]) - 50).zfill(2)
+        decrypted = prefix + decrypted[2:]
+    return decrypted_numeric_to_id(decrypted)
+
+def try_encrypt_record(df, idx, key, results, actual_index, plus50=False):
     id_str = df.at[idx, 'ID']
-    plaintext, encrypted, cipher = create_cipher_and_encrypt(id_str, idx, key, plus50=False)
+    plaintext, encrypted, cipher = create_cipher_and_encrypt(id_str, actual_index, key, plus50=plus50)
     if int(encrypted[:2]) < 50:
-        decrypted_id = decrypt_to_id(encrypted, cipher, plus50=False)
+        decrypted_id = decrypt_to_id(encrypted, cipher, plus50=plus50)
         results.append({
             "Original_ID": id_str,
             "Plaintext": plaintext,
             "Encrypted_Numeric": encrypted,
             "Encrypted_ID": encrypted_numeric_to_id(encrypted),
             "Decrypted_ID": decrypted_id,
-            "Plus50": False,
-            "swap_count": swap_count_map.get(idx, 0)
+            "Plus50": plus50,
+            "Original_Index": idx,
+            "Encrypt_Index": actual_index
         })
         return True
-    else:
-        plaintext, encrypted, cipher = create_cipher_and_encrypt(id_str, idx, key, plus50=True)
-        if int(encrypted[:2]) < 50:
-            decrypted_id = decrypt_to_id(encrypted, cipher, plus50=True)
-            results.append({
-                "Original_ID": id_str,
-                "Plaintext": plaintext,
-                "Encrypted_Numeric": encrypted,
-                "Encrypted_ID": encrypted_numeric_to_id(encrypted),
-                "Decrypted_ID": decrypted_id,
-                "Plus50": True,
-                "swap_count": swap_count_map.get(idx, 0)
-            })
-            return True
     return False
 
-def decrypt_with_swap_logic(encrypted_numeric, plus50, original_index, encrypt_index, key):
-    distance = abs(original_index - encrypt_index)
-    if original_index > encrypt_index:
-        final_index = original_index - distance
-    else:
-        final_index = original_index + distance
-
-    tweak = generate_tweak(final_index)
-    cipher = FF3Cipher(key, tweak)
-
-    try:
-        decrypted_numeric = cipher.decrypt(encrypted_numeric)
-        if plus50:
-            prefix = str(int(decrypted_numeric[:2]) - 50).zfill(2)
-            decrypted_numeric = prefix + decrypted_numeric[2:]
-        return decrypted_numeric_to_id(decrypted_numeric)
-    except Exception as e:
-        return f"DECRYPTION_FAILED: {str(e)}"
-        
 def encrypt_with_swap_if_needed(df, idx, key):
     results = []
-    swap_count_map = {i: 0 for i in range(len(df))}
 
     while idx < len(df):
-        # 嘗試原始順序加密
-        if try_encrypt_record(df, idx, key, swap_count_map, results):
+        # 嘗試原始明文
+        if try_encrypt_record(df, idx, key, results, idx, plus50=False):
             idx += 1
             continue
 
-        # 嘗試與下一筆交換
+        # 嘗試原始明文 +50
+        success_plus50 = try_encrypt_record(df, idx, key, results, idx, plus50=True)
+        if success_plus50:
+            idx += 1
+            continue
+
+        # 回復原始明文，開始進行 swap
         if idx + 1 < len(df):
             df.at[idx, 'ID'], df.at[idx + 1, 'ID'] = df.at[idx + 1, 'ID'], df.at[idx, 'ID']
-            swap_count_map[idx + 1] = swap_count_map.get(idx, 0) + 1
-            swap_count_map[idx] = swap_count_map.get(idx + 1, 0)
-
-            if try_encrypt_record(df, idx, key, swap_count_map, results):
+            if try_encrypt_record(df, idx, key, results, idx, plus50=False):
+                idx += 1
+                continue
+            if try_encrypt_record(df, idx, key, results, idx, plus50=True):
                 idx += 1
                 continue
 
-        # 嘗試與下下筆交換
         if idx + 2 < len(df):
             df.at[idx, 'ID'], df.at[idx + 2, 'ID'] = df.at[idx + 2, 'ID'], df.at[idx, 'ID']
-            swap_count_map[idx + 2] = swap_count_map.get(idx, 0) + 2
-            swap_count_map[idx] = swap_count_map.get(idx + 2, 0)
-
-            if try_encrypt_record(df, idx, key, swap_count_map, results):
+            if try_encrypt_record(df, idx, key, results, idx, plus50=False):
+                idx += 1
+                continue
+            if try_encrypt_record(df, idx, key, results, idx, plus50=True):
                 idx += 1
                 continue
 
-        # 最終失敗：三次都無法滿足條件，放棄該筆
+        # 無法加密成功
         id_str = df.at[idx, 'ID']
         plaintext = id_to_numeric(id_str)
         results.append({
@@ -156,7 +138,8 @@ def encrypt_with_swap_if_needed(df, idx, key):
             "Encrypted_ID": "A000000000",
             "Decrypted_ID": "",
             "Plus50": False,
-            "swap_count": swap_count_map.get(idx, 0)
+            "Original_Index": idx,
+            "Encrypt_Index": -1
         })
         idx += 1
 
