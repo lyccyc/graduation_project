@@ -1,5 +1,6 @@
 import hashlib
 from ff3 import FF3Cipher
+import pandas as pd
 
 KEY = "2DE79D232DF5585D68CE47882AE256D6"
 
@@ -35,6 +36,15 @@ translate_map = {
 }
 
 reverse_map = {v: k for k, v in letter_map.items()}
+df = pd.DataFrame()
+df['Numeric'] = ""
+df['Encrypted_Numeric'] = ""
+df['Encrypted_ID'] = ""
+df['Status'] = ""
+df['Swap_Index'] = -1
+df['Plus50'] = False
+df['Decrypted_Numeric'] = ""
+df['Decrypted_ID'] = ""
 
 def calculate_check_digit(id9):
     weights = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1]
@@ -109,15 +119,13 @@ def adject_value(num_arr, en_arr):
         if judge < 50:                  #本國
             if tmp >= 50:
                 judge += 50
-            else:
-                judge = str(judge)
+            judge = str(judge)
 
         else:                           #外來
             if tmp < 50:
                 judge -= 50
-            else:
-                judge = str(judge)
-        result[i] = tmp + num_arr[i][2:]
+            judge = str(judge)
+        result[i] = judge + num_arr[i][2:]
     return result
 
 def generate_tweak(index):
@@ -128,3 +136,38 @@ def decrypt_to_ID(decrypt):
     letter = reverse_map[prefix]
     rest = decrypt[2:]
     return letter + rest
+
+def encrypt_fun(plaintext,idx):
+    tweak = generate_tweak(idx)
+    cipher = FF3Cipher(KEY, tweak)
+    ciphertext = cipher.encrypt(plaintext)
+    return ciphertext
+
+def encrypt_with_mod(plaintext,idx,is_local):
+    tweak = generate_tweak(idx)
+    cipher = FF3Cipher(KEY, tweak)
+    ciphertext = cipher.encrypt(plaintext)
+
+    prefix = int(plaintext[:2])
+    cipher_prefix = int(ciphertext[:2])
+
+    if is_local and cipher_prefix < 50:
+        return ciphertext, "OK"
+    elif not is_local and cipher_prefix >= 50:
+        return ciphertext, "OK"
+    else:
+        # === 嘗試 +/-50 修正後再次加密 ===
+        if is_local:
+            adjusted_plaintext = str(prefix + 50) + plaintext[2:]
+        else:
+            adjusted_plaintext = str(prefix - 50) + plaintext[2:]
+
+        adjusted_ciphertext = encrypt_fun(adjusted_plaintext, idx)
+
+        adjusted_cipher_prefix = int(adjusted_ciphertext[:2])
+        if is_local and adjusted_cipher_prefix < 50:
+            return adjusted_ciphertext, "FIXED_50"
+        elif not is_local and adjusted_cipher_prefix >= 50:
+            return adjusted_ciphertext, "FIXED_50"
+        else:
+            return None, "FAILED"

@@ -6,45 +6,25 @@ key = "2DE79D232DF5585D68CE47882AE256D6"
 
 def FF3(input_csv, output_csv):
     df = pd.read_csv(input_csv)
-    df['Numeric'] = ""
-    df['Encrypted_Numeric'] = ""
-    df['Encrypted_ID'] = ""
-    df['Status'] = ""
-    df['Swap_Index'] = -1
-    df['Plus50'] = False
-    df['decrypt_Numeric'] = ""
-    df['decrypt_ID'] = ""
+
     for idx in df.index:
-        numeric = ff3.IDN_to_number(df.loc[idx,'ID'])
-        df.loc[idx, 'Numeric'] = numeric
+        df.loc[idx, 'Numeric'] = ff3.IDN_to_number(df.loc[idx, 'ID'])
+
     for idx in df.index:
-        numeric = df.loc[idx, 'Numeric']
-        tweak = ff3.generate_tweak(idx)
-        cipher = FF3Cipher(key, tweak)
-        plaintext = numeric
-        encrypted = cipher.encrypt(plaintext)
+        plaintext = df.loc[idx, 'Numeric']
         is_local = int(plaintext[:2]) < 50
+        encrypted, status = ff3.encrypt_with_mod(plaintext, idx, is_local)
 
-        if(is_local and int(encrypted[:2]) < 50) or (not is_local and int(encrypted[:2]) >= 50):
-            df.loc[idx, 'Encrypted_Numeric'] = encrypted
-            df.loc[idx, 'Encrypted_ID'] = ff3.number_to_IDN(encrypted)
-            df.loc[idx, 'Status'] = "OK"
-            continue
+        df.loc[idx, 'Encrypted_Numeric']= encrypted
+        df.loc[idx, 'Status'] = status
+        
+        if status != "FAILED":
+            df.loc[idx, 'Status'] = status
+            df.loc[idx, 'Swap_Log'] = f"No Swap"
 
-        modified_prefix = int(plaintext[:2]) + (50 if is_local else -50)
-        modified_plain = str(modified_prefix).zfill(2) + plaintext[2:]
-
-        df.loc[idx, 'Plus50'] = True
-        encrypted2 = cipher.encrypt(modified_plain)
-
-        if (is_local and int(encrypted2[:2]) < 50) or (not is_local and int(encrypted2[:2]) >= 50):
-            # 重算成功
-            df.loc[idx, 'Encrypted_Numeric'] = encrypted2
-            df.loc[idx, 'Encrypted_ID'] = ff3.number_to_IDN(encrypted2)
-            df.loc[idx, 'Status'] = "FIXED_50"
-            continue
-
-            # 無法成功 → 對調處理
+    print(df)
+    """
+        # 無法成功 → 對調處理
         swap_success = False
         for j in range(idx + 1, len(df)):
             # 先處理 index j 的資料（被調上來者）
@@ -76,19 +56,16 @@ def FF3(input_csv, output_csv):
         tweak = ff3.generate_tweak(idx)
         cipher = FF3Cipher(key, tweak)
         enc_num = df.loc[idx, 'Encrypted_Numeric']
-        
+        status = df.loc[idx, 'Status']
 
-        if enc_num == "XXXXXXXXXX":
-            continue
-
-        if "status" == "OK":
+        if status == "OK":
             decrypt = cipher.decrypt(enc_num)
-            df.loc[idx, 'Decrypt_Numeric'] = decrypt
+            df.loc[idx, 'Decrypted_Numeric'] = decrypt
             decrypt_ID = ff3.decrypt_to_ID(decrypt)
             df.loc[idx, 'Decrypted_ID'] = decrypt_ID
-        if "status" == "FIXED_50":
+        if status == "FIXED_50":
             decrypt = cipher.decrypt(enc_num)
-            df.loc[idx, 'Decrypt_Numeric'] = decrypt
+            df.loc[idx, 'Decrypted_Numeric'] = decrypt
             if is_local:
                 prefix = int(decrypt[:2]) - 50 
             else:
@@ -96,12 +73,13 @@ def FF3(input_csv, output_csv):
             decrypt_num = str(prefix) + decrypt[2:]
             decrypt_ID = ff3.decrypt_to_ID(decrypt_num)
             df.loc[idx, 'Decrypted_ID'] = decrypt_ID
-        
+
 # ===== 儲存結果 =====
     df.to_csv(output_csv, index=False)
     print(f"加解密完成，結果寫入 {output_csv}")
 
+"""
 if __name__ == "__main__":
     input_csv = "files/all_id_list.csv"
-    output_csv = "files/ff3_encrypted_all_output.csv"
+    output_csv = "files/ff3_encrypted_all_output_v2.csv"
     FF3(input_csv, output_csv)
