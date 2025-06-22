@@ -138,10 +138,14 @@ def decrypt_to_ID(decrypt):
     return letter + rest
 
 def encrypt_fun(plaintext,idx):
-    tweak = generate_tweak(idx)
-    cipher = FF3Cipher(KEY, tweak)
-    ciphertext = cipher.encrypt(plaintext)
-    return ciphertext
+    try:
+        tweak = generate_tweak(idx)
+        cipher = FF3Cipher(KEY, tweak)
+        ciphertext = cipher.encrypt(plaintext)
+        return ciphertext
+    except Exception as e:
+        print(f"[加密錯誤] idx={idx}, plaintext={plaintext}, 錯誤: {e}")
+        return None
 
 def encrypt_with_mod(plaintext,idx,is_local):
     tweak = generate_tweak(idx)
@@ -152,22 +156,52 @@ def encrypt_with_mod(plaintext,idx,is_local):
     cipher_prefix = int(ciphertext[:2])
 
     if is_local and cipher_prefix < 50:
-        return ciphertext, "OK"
+        return plaintext, ciphertext, "OK"
     elif not is_local and cipher_prefix >= 50:
-        return ciphertext, "OK"
+        return plaintext, ciphertext, "OK"
     else:
         # === 嘗試 +/-50 修正後再次加密 ===
         if is_local:
             adjusted_plaintext = str(prefix + 50) + plaintext[2:]
         else:
-            adjusted_plaintext = str(prefix - 50) + plaintext[2:]
+            adjusted_plaintext = str(prefix - 50).zfill(2) + plaintext[2:]
 
         adjusted_ciphertext = encrypt_fun(adjusted_plaintext, idx)
 
         adjusted_cipher_prefix = int(adjusted_ciphertext[:2])
         if is_local and adjusted_cipher_prefix < 50:
-            return adjusted_ciphertext, "FIXED_50"
+            return adjusted_plaintext, adjusted_ciphertext, "FIXED_50"
         elif not is_local and adjusted_cipher_prefix >= 50:
-            return adjusted_ciphertext, "FIXED_50"
+            return adjusted_plaintext, adjusted_ciphertext, "FIXED_50"
         else:
-            return None, "FAILED"
+            return adjusted_plaintext, None, "FAILED"
+        
+def encrypt_with_swap(df, start_index):
+    current_index = start_index
+    max_index = len(df) - 1
+
+    while current_index + 1 <= max_index:
+        # 對調 current_index 和 current_index + 1
+        df.iloc[[current_index, current_index + 1]] = df.iloc[[current_index + 1, current_index]]
+
+        # 先處理對調後上來的資料（即 current_index）
+        row = df.iloc[current_index]
+        # tweak = generate_tweak(current_index)
+        plaintext = row['Numeric'][:9]
+        is_local = int(plaintext[:2]) < 50
+        plaintext, encrypted, status= encrypt_with_mod(plaintext,current_index, is_local)
+
+        if status in ["OK", "FIXED_50"]:
+            df.at[df.index[current_index], 'plaintext'] = plaintext
+            df.at[df.index[current_index], 'Encrypted_Numeric'] = encrypted
+            df.at[df.index[current_index], 'Status'] = status
+            return plaintext, encrypted, status, current_index 
+
+        # 對調無效，還原（但不是退回上一個，而是繼續對調更後面的）
+        plaintext = df.loc[current_index , 'original_plaintext']
+        # 對調回來後再對調到下一筆（往後兩筆）
+        current_index += 1  # 對調往後滑動，直到成功為止
+        encrypt_with_mod(plaintext,current_index, is_local)
+    
+    # 若到了最後都還不成功，也不設為 FAILED，視為極限應該不會發生
+    return None, None, "UNRESOLVED", None

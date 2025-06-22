@@ -9,20 +9,25 @@ def FF3(input_csv, output_csv):
 
     for idx in df.index:
         df.loc[idx, 'Numeric'] = ff3.IDN_to_number(df.loc[idx, 'ID'])
+        df.loc[idx, 'plaintext'] = df.loc[idx, 'Numeric'][:9]
+        df.loc[idx, 'original_plaintext'] = df.loc[idx, 'Numeric'][:9]
+    print(df)
 
     for idx in df.index:
-        plaintext = df.loc[idx, 'Numeric']
+        plaintext =  df.loc[idx, 'plaintext']
         is_local = int(plaintext[:2]) < 50
-        encrypted, status = ff3.encrypt_with_mod(plaintext, idx, is_local)
+        plaintext, encrypted, status = ff3.encrypt_with_mod(plaintext, idx, is_local)
 
+        if status == "FAILED":
+            plaintext, encrypted, status, final_index =ff3.encrypt_with_swap(df, idx)
+
+        df.loc[idx, 'plaintext'] = plaintext
         df.loc[idx, 'Encrypted_Numeric']= encrypted
         df.loc[idx, 'Status'] = status
-        
-        if status != "FAILED":
-            df.loc[idx, 'Status'] = status
-            df.loc[idx, 'Swap_Log'] = f"No Swap"
 
-    print(df)
+    df.to_csv(tmp_output, index=False)
+    print(f"加解密完成，結果寫入 {tmp_output}")
+
     """
         # 無法成功 → 對調處理
         swap_success = False
@@ -82,4 +87,5 @@ def FF3(input_csv, output_csv):
 if __name__ == "__main__":
     input_csv = "files/all_id_list.csv"
     output_csv = "files/ff3_encrypted_all_output_v2.csv"
+    tmp_output = "files/tmp_output_v2.csv"
     FF3(input_csv, output_csv)
