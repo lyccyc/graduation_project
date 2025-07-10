@@ -1,6 +1,6 @@
 import pandas as pd
 from ff3 import FF3Cipher
-import ff3_lib as ff3
+import ff3_lib_v2 as ff3
 
 key = "2DE79D232DF5585D68CE47882AE256D6"
 
@@ -83,6 +83,7 @@ def FF3(input_csv, output_csv):
     print(f"加解密完成，結果寫入 {output_csv}")
 
 if __name__ == "__main__":
-    input_csv = "files/id_files/all_id_list_v2_uneven.csv"
-    output_csv = "files/ff3_files/ff3_encrypted_all_output_uneven.csv"
+    input_csv = "files/all_id_list_v2_uneven.csv"
+    output_csv = "files/ff3_encrypted_all_output_uneven.csv"
+    # tmp_output = "files/tmp_output_v2.csv"
     FF3(input_csv, output_csv)
