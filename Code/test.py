@@ -103,10 +103,7 @@ def FF3(input_csv, output_csv):
     df['Encrypted_ID'] = ''
     df['Decrypted_Numeric'] = ''
     df['Decrypted_ID'] = ''
-    df['Status'] = ''
-    df['plus50'] = False
-    df['Swap_Index'] = -1 # 初始化為 -1
-
+    
     for idx in df.index:
         df.loc[idx, 'Numeric'] = ff3.IDN_to_number(df.loc[idx, 'ID'])
         df.loc[idx, 'plaintext'] = df.loc[idx, 'Numeric'][:9]

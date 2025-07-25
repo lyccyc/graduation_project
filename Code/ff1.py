@@ -12,11 +12,14 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Random import get_random_bytes
 import pandas as pd
+import hashlib
 
 # # 讀取 16bytes 的密鑰
 # f = open('key_for_16_bit.txt')
 # key = f.read()
 # f.close()
+
+key = "2DE79D232DF5585D68CE47882AE256D6"
 
 def CIPH(key, X):
     """
@@ -182,6 +185,10 @@ def FF1_decrypt(ciphertext, radix, key, tweak):
         A = str_radix_m(c, m, radix)
 
     return A + B
+
+def generate_tweak(index):
+    return hashlib.sha256(str(index).encode()).hexdigest()[:14].upper()
+
 def adject_position(arr):
     n = len(arr)
     even_index = 1
@@ -352,91 +359,17 @@ def count_check_code(arr):
         result[i] = arr[i] + str(check_code%10)
     return result
 
-"""
-# 示例数据
-key = get_random_bytes(16)
-plaintext = "1234567890123456"
-tweak = 1234
+def main():
+    ID = ["A231217403", "A123456789"]
+    plaintext = IDN_to_number(ID)
+    for i in plaintext:
+        tweak = generate_tweak(i)
+        Encrypted_num = FF1(i,10,key,tweak)
+        Encrypted_ID = number_to_IDN(Encrypted_num)
+        Decrypted_num = FF1_decrypt(Encrypted_num,10,key,tweak)
+        Decrypted_ID = number_to_IDN(Decrypted_num)
+        print(Encrypted_num, Encrypted_ID, Decrypted_num, Decrypted_ID)
 
 
-# 加密
-ciphertext = FF1(plaintext, 10, key, tweak)
-print("Ciphertext:", ciphertext)
-
-# 解密
-decrypted_text = FF1_decrypt(ciphertext, 10, key, tweak)
-print("Decrypted text:", decrypted_text)
-
-
-# 生成一个16字节的随机AES密钥
-key = get_random_bytes(16)
-id_number = pd.read_csv('id_number.csv')
-print(id_number)
-id_number['P'] = IDN_to_number(id_number['X[1~10]'])
-id_number['Q'] = IDN_to_number(id_number['X[1~10]'])
-for i in id_number['P'].index:
-    id_number['Q'][i] = FF1(id_number['P'][i], 10, key)
-print(id_number)
-id_number['adject position'] = adject_position(id_number['Q'])
-id_number['adject value'] = adject_value(id_number['adject position'])
-print(id_number)
-id_number['Y[1~9]'] = number_to_IDN(id_number['adject value'])
-print(id_number)
-id_number['Y[1~10]'] = count_check_code(id_number['Y[1~9]'])
-id_number['Y[1~10]'] = check_upsidedown(id_number['Y[1~10]'], id_number['adject position'])
-print(id_number)
-
-big = small = 0
-for i in id_number['Q']:
-    tmp = int(i[0])
-    if tmp < 5:
-        small += 1
-    else:
-        big += 1
-print(small, big)
-
-for i in range(65, 91):
-    tmp = i%26
-    if tmp == 12:
-        tmp = 11
-    if tmp >= 13 and tmp <= 24:
-        tmp = tmp + 26*2
-    else:
-        if tmp == 11:
-            tmp = tmp + 1
-        tmp = tmp +26*3
-    A = chr(tmp)
-    print(A)
-
-def rearrange_array(arr):
-    n = len(arr)
-    even_index = 0
-    odd_index = 1
-    result = [None] * n
-
-    for num in arr:
-        if even_index >= n:
-            result[odd_index] = num
-            odd_index += 2
-            continue
-        elif odd_index >= n:
-            result[even_index] = num
-            even_index += 2
-            continue
-        else:
-            if num < 50:
-                if even_index < n:
-                    result[even_index] = num
-                    even_index += 2
-            else:
-                if odd_index < n:
-                    result[odd_index] = num
-                    odd_index += 2
-    return result
-
-
-# 示例數據
-array = [10, 20, 30, 40, 50, 60, 70, 80, 90]
-sorted_array = rearrange_array(array)
-print(sorted_array)
-"""
+if __name__ == "__main__":
+    main()

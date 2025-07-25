@@ -2,6 +2,7 @@ import math
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Random import get_random_bytes
+import hashlib
 import pandas as pd
 
 letter_map = {
@@ -38,6 +39,8 @@ translate_map = {
 }
 
 reverse_map = {v: k for k, v in letter_map.items()}
+
+key = "2DE79D232DF5585D68CE47882AE256D6"
 
 def CIPH(key, X):
     """
@@ -201,94 +204,50 @@ def FF1_decrypt(ciphertext, radix, key, tweak):
 
         c = (NUM_radix(int(A), radix) - y) % radix ** m
         A = str_radix_m(c, m, radix)
-
+"""
 def adject_position(arr):
-    n = len(arr)
-    even_index = 1
-    odd_index = 0
-    result = [None] * n
-
-    for i in arr:
-        num = int(i[0:2])
-        if even_index >= n:
-            result[odd_index] = i
-            odd_index += 2
-            continue
-        elif odd_index >= n:
-            result[even_index] = i
-            even_index += 2
-            continue
-        else:
-            if num >= 50:
-                if even_index < n:
-                    result[even_index] = i
-                    even_index += 2
-            else:
-                if odd_index < n:
-                    result[odd_index] = i
-                    odd_index += 2
-    return result
+    abc
 
 def adject_value(num_arr, en_arr):
-    n = len(num_arr)
-    result = [None] * n
-
-    for i in num_arr.index:
-        tmp = int(en_arr[i][0:2])       #加密後字串
-        judge = int(num_arr[i][0:2])    #對照表轉換後字串
-        if judge < 50:                  #本國
-            if tmp >= 50:
-                judge += 50
-            else:
-                judge = str(judge)
-
-        else:                           #外來
-            if tmp < 50:
-                judge -= 50
-            else:
-                judge = str(judge)
-        result[i] = tmp + num_arr[i][2:]
-    return result
-
+    abc
+"""
 def calculate_check_digit(id9):
     weights = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1]
     return str((10 - sum(int(n)*w for n, w in zip(id9, weights)) % 10) % 10)
 
-def number_to_IDN(arr):
-    n = len(arr)
-    result = [None] * n
+def number_to_IDN(id_number):
+    letter = reverse_map[id_number[:2]][0]
+    gender = reverse_map[id_number[:2]][1]
+    rest = id_number[2:9]
+    id9 = letter + gender + rest
+    check = calculate_check_digit(id9)
+    return  letter + gender + rest + check
 
-    for i in arr.index:
-        result_ = ''
-        letter = reverse_map[arr[i][:2]]
-        translate_letter = translate_map[letter[0]]
-        rest = arr[i][2:9]
-        check = calculate_check_digit(translate_letter + rest)
-        result_ = letter + rest + check
-        result[i] = result_
-    return result
+def IDN_to_number(id_number):
+    prefix = id_number[0:2]
+    numeric_prefix = int(letter_map[prefix])
+    return str(numeric_prefix).zfill(2) + id_number[2:10]
 
-def IDN_to_number(arr):
-    n = len(arr)
-    result = [None] * n
+def generate_tweak(index):
+    return hashlib.sha256(str(index).encode()).hexdigest()[:14].upper()
 
-    for i in arr.index:
-        C =''
-        prefix = arr[i][0:2]
-        numeric_prefix = int(letter_map[prefix])
-        C = str(numeric_prefix) + arr[i][2:10]
-    result[i] = C
-    return result
+def decrypt_to_ID(decrypt):
+    prefix = decrypt[:2]
+    letter = reverse_map[prefix]
+    rest = decrypt[2:]
+    return letter + rest
 
-def check_upsidedown(arr, check):
-    n = len(arr)
-    result = [None] * n
+def main(arr):
+    for i in range(len(arr)):
+        plaintext = IDN_to_number(ID[i])
+        tweak = i.to_bytes(16,'big')
+        Encrypted_num = FF1(plaintext,10,key,tweak)
+        Encrypted_ID = number_to_IDN(Encrypted_num)
+        Decrypted_num = FF1_decrypt(Encrypted_num,10,key,tweak)
+        Decrypted_ID = number_to_IDN(Decrypted_num)
+        print(Encrypted_num, Encrypted_ID, Decrypted_num, Decrypted_ID)
 
-    for i in arr.index:
-        if (int(check[i][0:2]) >= 50) and (i%2 == 0):
-            result[i] = arr[i][1] + arr[i][0] + arr[i][2:]
-        elif (int(check[i][0:2]) < 50) and (i%2 == 1):
-            result[i] = arr[i][1] + arr[i][0] + arr[i][2:]
-        else:
-            result[i] = arr[i]
-    return result
+
+if __name__ == "__main__":
+    ID = ["A231217403", "A123456789"]
+    main(ID)

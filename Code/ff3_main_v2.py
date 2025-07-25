@@ -83,7 +83,12 @@ def FF3(input_csv, output_csv):
     print(f"加解密完成，結果寫入 {output_csv}")
 
 if __name__ == "__main__":
+    """
     input_csv = "files/all_id_list_v2_uneven.csv"
     output_csv = "files/ff3_encrypted_all_output_uneven.csv"
+    """
+    #12筆測試
+    input_csv = "files/id_files/12_test_ids.csv"
+    output_csv = "files/ff3_files/12_encrypted_output.csv"
     # tmp_output = "files/tmp_output_v2.csv"
     FF3(input_csv, output_csv)

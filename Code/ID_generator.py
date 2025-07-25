@@ -66,7 +66,7 @@ def generate_id():
     first_num = (letter_value // 10) * weights[0] + (letter_value % 10) * weights[1]
 
     # 性別 (1:男, 2:女, 8:外籍男, 9:外籍女)，設定加權機率
-    gender = random.choices([1, 2, 8, 9], weights=[37.5, 37.5, 12.5, 12.5])[0]
+    gender = random.choices([1, 2, 8, 9], weights=[41.7, 41.7, 8.3, 8.3])[0]
 
     # 產生隨機的 7 個數字
     random_numbers = [random.randint(0, 9) for _ in range(7)]

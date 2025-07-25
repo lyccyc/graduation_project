@@ -6,8 +6,9 @@ import pandas as pd
 
 # df = pd.read_csv("files/ff3_files/ff3_encrypted_output_ave.csv")
 # df = pd.read_csv("files/ff3_files/ff3_encrypted_output_uneven.csv")
-df = pd.read_csv("files/ff3_files/ff3_encrypted_all_output_ave.csv")
+# df = pd.read_csv("files/ff3_files/ff3_encrypted_all_output_ave.csv")
 # df = pd.read_csv("files/ff3_files/ff3_encrypted_all_output_uneven.csv")
+df = pd.read_csv("files/ff3_files/10even_test.csv")
 
 df['Encrypted_Gender_Code'] = df['Encrypted_ID'].astype(str).str[1]
 encrypted_gender_counts = df['Encrypted_Gender_Code'].value_counts().sort_index()
